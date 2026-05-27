@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAG Research IDE - 产品演示</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --color-primary: #3b82f6;
+            --color-secondary: #8b5cf6;
+            --color-background: #0f172a;
+            --color-surface: #1e293b;
+            --color-text: #e2e8f0;
+            --color-muted: #94a3b8;
+            --color-accent: #06b6d4;
+            --gradient-primary: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            --gradient-hero: linear-gradient(135deg, #1e293b 0%, #0f172a 50%, #1a1040 100%);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--color-background);
+            color: var(--color-text);
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            overflow: hidden;
+        }
+
+        .slide-deck {
+            position: relative;
+            width: 100vw; height: 100vh;
+            overflow: hidden;
+        }
+
+        @media (min-width: 769px) {
+            .slide-deck {
+                max-width: calc(100vh * 16 / 9);
+                max-height: calc(100vw * 9 / 16);
+                margin: auto;
+                position: absolute;
+                inset: 0;
+            }
+        }
+
+        .slide {
+            position: absolute;
+            width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 60px 80px;
+            opacity: 0; visibility: hidden;
+            transition: opacity 0.4s;
+            background: var(--color-background);
+            overflow: hidden;
+        }
+        .slide.active { opacity: 1; visibility: visible; }
+
+        /* Typography */
+        h1 { font-size: clamp(36px, 6vw, 72px); font-weight: 800; line-height: 1.15; }
+        h2 { font-size: clamp(24px, 4vw, 48px); font-weight: 700; margin-bottom: 24px; }
+        h3 { font-size: clamp(18px, 2.5vw, 28px); font-weight: 600; }
+        p, li { font-size: clamp(15px, 2vw, 20px); line-height: 1.7; color: var(--color-muted); }
+        .slide-content { max-width: 900px; width: 100%; }
+
+        /* Gradients */
+        .gradient-text {
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Layouts */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; text-align: left; align-items: center; }
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; text-align: left; }
+        .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; text-align: center; }
+        @media (max-width: 768px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+
+        /* Cards */
+        .card {
+            background: var(--color-surface);
+            border-radius: 16px;
+            padding: 28px 24px;
+            border: 1px solid rgba(255,255,255,0.06);
+        }
+        .card h3 { margin-bottom: 8px; }
+        .card p { font-size: 14px; }
+        .card-icon { font-size: 32px; margin-bottom: 12px; }
+
+        /* Metric card */
+        .metric-card { text-align: center; }
+        .metric-value { font-size: clamp(32px, 5vw, 56px); font-weight: 800; color: var(--color-primary); }
+        .metric-label { font-size: 14px; color: var(--color-muted); margin-top: 4px; }
+
+        /* Architecture diagram */
+        .arch-box {
+            display: flex; gap: 12px; justify-content: center; align-items: stretch;
+            margin: 24px 0;
+        }
+        .arch-panel {
+            flex: 1; background: var(--color-surface); border-radius: 12px;
+            padding: 20px 16px; text-align: center;
+            border-top: 3px solid var(--color-primary);
+        }
+        .arch-panel:nth-child(2) { border-top-color: var(--color-secondary); }
+        .arch-panel:nth-child(3) { border-top-color: var(--color-accent); }
+        .arch-panel h4 { font-size: 15px; margin-bottom: 6px; }
+        .arch-panel p { font-size: 12px; }
+
+        /* Pipeline flow */
+        .pipeline {
+            display: flex; gap: 8px; align-items: center; justify-content: center;
+            flex-wrap: wrap; margin: 24px 0;
+        }
+        .pipe-step {
+            background: var(--gradient-primary); color: white;
+            padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600;
+        }
+        .pipe-arrow { color: var(--color-muted); font-size: 20px; }
+
+        /* Tech stack tags */
+        .tag { display: inline-block; padding: 6px 16px; border-radius: 20px; font-size: 13px; margin: 4px; }
+        .tag-primary { background: rgba(59,130,246,0.2); color: #60a5fa; }
+        .tag-purple { background: rgba(139,92,246,0.2); color: #a78bfa; }
+        .tag-cyan { background: rgba(6,182,212,0.2); color: #22d3ee; }
+        .tag-green { background: rgba(34,197,94,0.2); color: #4ade80; }
+
+        /* Chart container */
+        .chart-container { width: min(80%, 600px); height: clamp(200px, 35vh, 320px); margin: 16px auto; }
+
+        /* Nav */
+        .progress-bar { position: fixed; top: 0; left: 0; height: 3px; background: var(--gradient-primary); transition: width 0.3s; z-index: 1000; }
+        .nav-controls { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 20px; z-index: 1000; }
+        .nav-btn { background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.1); color: #fff; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 16px; }
+        .nav-btn:hover { background: rgba(255,255,255,0.15); }
+        .slide-counter { color: rgba(255,255,255,0.4); font-size: 14px; }
+
+        /* Anims */
+        .animate-fade-up { animation: fadeUp 0.6s ease-out forwards; opacity: 0; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-stagger > * { opacity: 0; animation: fadeUp 0.5s ease-out forwards; }
+        .animate-stagger > *:nth-child(1) { animation-delay: 0.1s; }
+        .animate-stagger > *:nth-child(2) { animation-delay: 0.2s; }
+        .animate-stagger > *:nth-child(3) { animation-delay: 0.3s; }
+        .animate-stagger > *:nth-child(4) { animation-delay: 0.4s; }
+        .animate-stagger > *:nth-child(5) { animation-delay: 0.5s; }
+        .animate-stagger > *:nth-child(6) { animation-delay: 0.6s; }
+        /* Force animation on active slide */
+        .slide.active .animate-stagger > * { animation-play-state: running; }
+        .slide.active .animate-fade-up { animation-play-state: running; }
+    </style>
+</head>
+<body>
+    <div class="progress-bar" id="progressBar"></div>
+
+    <div class="slide-deck">
+
+    <!-- Slide 1: Title -->
+    <div class="slide active" style="background: var(--gradient-hero);">
+        <div class="slide-content animate-fade-up">
+            <p style="color: var(--color-primary); font-weight: 600; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 16px;">RAG Research IDE</p>
+            <h1 class="gradient-text">让 AI 读懂你的论文</h1>
+            <p style="margin-top: 16px; max-width: 600px;">桌面端 AI 科研助手 — 论文入库、语义检索、Agent 对话、Skill 扩展</p>
+            <div style="margin-top: 40px; display: flex; gap: 20px;">
+                <span class="tag tag-primary">PySide6 Desktop</span>
+                <span class="tag tag-purple">Anthropic SDK</span>
+                <span class="tag tag-cyan">ChromaDB</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 2: Problem -->
+    <div class="slide">
+        <div class="slide-content animate-stagger">
+            <p style="color: var(--color-primary); font-weight: 600; letter-spacing: 2px;">问题</p>
+            <h2>论文太多，阅读不过来</h2>
+            <div class="grid-3" style="margin-top: 32px;">
+                <div class="card">
+                    <div class="card-icon">📚</div>
+                    <h3>信息过载</h3>
+                    <p>每天数百篇新论文，无法高效筛选与自己研究方向相关的内容</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🔍</div>
+                    <h3>检索困难</h3>
+                    <p>关键词搜索不够精准，语义检索才能找到真正相关的内容</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">⏰</div>
+                    <h3>时间成本高</h3>
+                    <p>逐篇阅读、做笔记、写综述耗费大量时间，需要 AI 辅助</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 3: Solution -->
+    <div class="slide">
+        <div class="slide-content animate-fade-up">
+            <p style="color: var(--color-primary); font-weight: 600; letter-spacing: 2px;">方案</p>
+            <h2>本地 RAG + Agent 智能问答</h2>
+            <div class="grid-2" style="margin-top: 24px;">
+                <div class="card" style="text-align: left;">
+                    <h3 class="gradient-text">传统方式</h3>
+                    <p style="margin-top: 12px;">打开 PDF → 逐篇阅读 → 手动笔记 → 写综述<br>一次文献调研耗时数天</p>
+                </div>
+                <div class="card" style="text-align: left;">
+                    <h3 class="gradient-text">RAG Research IDE</h3>
+                    <p style="margin-top: 12px;">导入论文 → AI 自动入库 → 自然语言提问 → 即时获得带引用的答案<br>几分钟完成一次调研</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 4: Architecture -->
+    <div class="slide">
+        <div class="slide-content animate-fade-up">
+            <p style="color: var(--color-primary); font-weight: 600; letter-spacing: 2px;">架构</p>
+            <h2>三栏 IDE 布局</h2>
+            <div class="arch-box">
+                <div class="arch-panel">
+                    <h4>📂 文件树</h4>
+                    <p>项目浏览<br>PDF 右键入库<br>已入库标记</p>
+                </div>
+                <div class="arch-panel">
+                    <h4>📝 代码编辑器</h4>
+                    <p>多标签页<br>Python 语法高亮<br>行号 + 等宽字体</p>
+                </div>
+                <div class="arch-panel">
+                    <h4>🤖 Agent 对话</h4>
+                    <p>自然语言交互<br>工具自主调用<br>Skill 技能扩展</p>
+                </div>
+            </div>
+            <p style="font-size: 14px; margin-top: 16px;">所有 RAG 引擎直接 import，不走 HTTP，零网络延迟</p>
+        </div>
+    </div>
+
+    <!-- Slide 5: RAG Pipeline -->
+    <div class="slide">
+        <div class="slide-content animate-fade-up">
+            <p style="color: var(--color-primary); font-weight: 600; letter-spacing: 2px;">数据流</p>
+            <h2>论文入库 & 检索管线</h2>
+            <div class="pipeline">
+                <div class="pipe-step">PDF 解析</div>
+                <span class="pipe-arrow">→</span>
+                <div class="pipe-step">文本分块</div>
+                <span class="pipe-arrow">→</span>
+                <div class="pipe-step">向量嵌入</div>
+                <span class="pipe-arrow">→</span>
+                <div class="pipe-step">ChromaDB</div>
+            </div>
+            <div style="margin-top: 32px; text-align: left; max-width: 700px;">
+                <h3 style="text-align: center; margin-bottom: 16px;">检索策略（多阶段）</h3>
+                <div class="card" style="margin-bottom: 12px;"><strong>1. HyDE</strong> — LLM 生成假设文档，缩小语义差距</div>
+                <div class="card" style="margin-bottom: 12px;"><strong>2. 多路检索</strong> — Dense 向量 + BM25 关键词，加权融合</div>
+                <div class="card"><strong>3. Reranker</strong> — CrossEncoder 精排，取最优 Top K</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 6: Agent System -->
+    <div class="slide">
+        <div class="slide-content animate-stagger">
+            <p style="color: var(--color-primary); font-weight: 600; letter-spacing: 2px;">Agent</p>
+            <h2>类 Claude 的对话引擎</h2>
+            <div class="grid-2" style="margin-top: 24px;">
+                <div>
+                    <div class="card" style="margin-bottom: 16px;">
+                        <h3 style="color: var(--color-accent);">统一 System Prompt</h3>
+                        <p>无意图预分类，LLM 自行判断何时调工具</p>
+                    </div>
+                    <div class="card" style="margin-bottom: 16px;">
+                        <h3 style="color: var(--color-accent);">自然终止</h3>
+                        <p>while 循环 + stop_reason，不硬编码轮次上限</p>
+                    </div>
+                </div>
+                <div>
+                    <div class="card" style="margin-bottom: 16px;">
+                        <h3 style="color: var(--color-accent);">7 个工具</h3>
+                        <p>搜索、列表、入库、详情、Skill 加载 — dict 映射调度</p>
+                    </div>
+                    <div class="card">
+                        <h3 style="color: var(--color-accent);">Skill 系统</h3>
+                        <p>SKILL.md 驱动，双层加载（目录→全量），全局 + 项目级</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 7: Features -->
+    <div class="slide">
+        <div class="slide-content animate-stagger">
+            <p style="color: var(--color-primary); font-weight: 600; letter-spacing: 2px;">功能</p>
+            <h2>不只是论文搜索</h2>
+            <div class="grid-3" style="margin-top: 24px;">
+                <div class="card">
+                    <div class="card-icon">🔍</div>
+                    <h3>语义检索</h3>
+                    <p>HyDE + 多路检索 + Reranker，精准定位相关内容</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">💬</div>
+                    <h3>Agent 对话</h3>
+                    <p>引用论文来源的智能问答，支持文献综述撰写</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🧩</div>
+                    <h3>Skill 扩展</h3>
+                    <p>自定义 SKILL.md，按需加载专业工作流</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🖥️</div>
+                    <h3>远程开发</h3>
+                    <p>内置 SSH 终端 + SFTP 文件传输</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🎨</div>
+                    <h3>主题系统</h3>
+                    <p>三层设计令牌，JSON 驱动，可扩展</p>
+                </div>
+                <div class="card">
+                    <div class="card-icon">📊</div>
+                    <h3>知识库管理</h3>
+                    <p>可视化查看/删除已入库论文，实时统计</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 8: Tech Stack -->
+    <div class="slide">
+        <div class="slide-content animate-fade-up">
+            <p style="color: var(--color-primary); font-weight: 600; letter-spacing: 2px;">技术栈</p>
+            <h2>纯 Python，全离线</h2>
+            <div style="margin-top: 32px; text-align: left; max-width: 700px;">
+                <div style="margin-bottom: 24px;">
+                    <h3 style="color: var(--color-muted); font-size: 14px; margin-bottom: 8px;">AI & LLM</h3>
+                    <span class="tag tag-primary">Anthropic SDK</span>
+                    <span class="tag tag-purple">sentence-transformers</span>
+                    <span class="tag tag-cyan">all-MiniLM-L6-v2</span>
+                </div>
+                <div style="margin-bottom: 24px;">
+                    <h3 style="color: var(--color-muted); font-size: 14px; margin-bottom: 8px;">数据 & 存储</h3>
+                    <span class="tag tag-purple">ChromaDB</span>
+                    <span class="tag tag-green">PyMuPDF</span>
+                    <span class="tag tag-primary">BM25 (rank-bm25)</span>
+                </div>
+                <div style="margin-bottom: 24px;">
+                    <h3 style="color: var(--color-muted); font-size: 14px; margin-bottom: 8px;">桌面 & 工具</h3>
+                    <span class="tag tag-cyan">PySide6</span>
+                    <span class="tag tag-green">paramiko (SSH)</span>
+                    <span class="tag tag-purple">arxiv SDK</span>
+                </div>
+                <div>
+                    <h3 style="color: var(--color-muted); font-size: 14px; margin-bottom: 8px;">架构特点</h3>
+                    <span class="tag tag-primary">设计令牌系统</span>
+                    <span class="tag tag-cyan">Skill 双层加载</span>
+                    <span class="tag tag-green">嵌入模型内置离线</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 9: Use Cases -->
+    <div class="slide">
+        <div class="slide-content animate-stagger">
+            <p style="color: var(--color-primary); font-weight: 600; letter-spacing: 2px;">场景</p>
+            <h2>谁在用？怎么用？</h2>
+            <div class="grid-2" style="margin-top: 32px;">
+                <div class="card">
+                    <h3>🎓 研究生 / 博士生</h3>
+                    <p>文献调研：导入领域论文，用自然语言提问，快速了解研究现状，写综述时一键引用</p>
+                </div>
+                <div class="card">
+                    <h3>🔬 科研工作者</h3>
+                    <p>跨领域学习：不熟悉的领域，导入几篇综述后直接对话，快速上手新方向</p>
+                </div>
+                <div class="card">
+                    <h3>💻 独立开发者</h3>
+                    <p>知识库搭建：将项目文档、技术论文导入，构建专属知识问答系统</p>
+                </div>
+                <div class="card">
+                    <h3>🏫 教学场景</h3>
+                    <p>课程辅助：导入教材和论文，学生可以提问，AI 给出带来源引用的解答</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Slide 10: CTA -->
+    <div class="slide" style="background: var(--gradient-hero);">
+        <div class="slide-content animate-fade-up">
+            <h1 class="gradient-text">开始构建你的知识库</h1>
+            <p style="margin-top: 20px; font-size: 20px;">纯 Python，本地运行，开源可扩展</p>
+            <div style="margin-top: 48px; display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+                <span class="tag tag-primary">conda activate rag</span>
+                <span class="tag tag-purple">pip install -r requirements.txt</span>
+                <span class="tag tag-cyan">python desktop/main.py</span>
+            </div>
+            <p style="margin-top: 48px; font-size: 15px; color: var(--color-muted);">桌面端 · Anthropic SDK · ChromaDB · 嵌入模型内置</p>
+        </div>
+    </div>
+
+    </div><!-- /.slide-deck -->
+
+    <div class="nav-controls">
+        <button class="nav-btn" onclick="prevSlide()">&#8592;</button>
+        <span class="slide-counter"><span id="current">1</span> / <span id="total">10</span></span>
+        <button class="nav-btn" onclick="nextSlide()">&#8594;</button>
+    </div>
+
+    <script>
+        let current = 1;
+        const total = document.querySelectorAll('.slide').length;
+        document.getElementById('total').textContent = total;
+
+        function showSlide(n) {
+            if (n < 1) n = 1;
+            if (n > total) n = total;
+            current = n;
+            document.querySelectorAll('.slide').forEach((s, i) => {
+                s.classList.toggle('active', i === n - 1);
+            });
+            document.getElementById('current').textContent = n;
+            document.getElementById('progressBar').style.width = (n / total * 100) + '%';
+        }
+
+        function nextSlide() { showSlide(current + 1); }
+        function prevSlide() { showSlide(current - 1); }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
+            if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.nav-controls')) nextSlide();
+        });
+
+        showSlide(1);
+    </script>
+</body>
+</html>
